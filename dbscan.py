@@ -7,12 +7,19 @@ NOISE = 0
 UNCLASSIFIED = -1
 
 
-def update_dbs(set_of_points):
-    sql_queryes = ""
+def update_dbs(set_of_points, sqldump=False):
+    queries = ""
     for gid, point in set_of_points.items():
-        sql_queryes = sql_queryes + ("UPDATE animale.animal SET label = " + str(point.label) + " WHERE gid=" + str(gid) + ";\n")
-    cur.execute(sql_queryes)
+        query = "UPDATE animale.animal SET label = " + str(point.label) + " WHERE gid=" + str(gid) + ";\n"
+        cur.execute(query)
+        queries += query
     print("UPDATE on DB")
+
+    if sqldump:
+        with open("dump.sql", 'w') as f:
+            f.write(queries)
+        print("Wrote dump.sql")
+
 
 
 def region_query(set_of_points, p, eps):
@@ -84,7 +91,7 @@ def dbscan(set_of_points, eps, minpts):
                 print("Found cluster = {}".format(cluster_id))
                 cluster_id = next_id()
 
-    update_dbs(set_of_points)
+    update_dbs(set_of_points, sqldump=True)
 
 if __name__ == '__main__':
     conn = psycopg2.connect(database="gis", user="postgres", password="AkrasiaPostgres", host="127.0.0.1", port="5432")
@@ -96,7 +103,7 @@ if __name__ == '__main__':
         p = Point(row)
         set_of_points[p.gid] = p
 
-    eps = 300
+    eps = 10
     minpts = 20
     dbscan(set_of_points, eps, minpts)
 
