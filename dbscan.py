@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 import psycopg2
 from Point import Point
+import csv
 
 CLUSTER_ID = 0
 NOISE = 0
 UNCLASSIFIED = -1
 
 
-def update_dbs(set_of_points, sqldump=False):
+def update_dbs(set_of_points, sqldump=False, csv_dump=False):
     queries = ""
     for gid, point in set_of_points.items():
         query = "UPDATE animale.animal SET label = " + str(point.label) + " WHERE gid=" + str(gid) + ";\n"
@@ -18,7 +19,22 @@ def update_dbs(set_of_points, sqldump=False):
     if sqldump:
         with open("dump.sql", 'w') as f:
             f.write(queries)
-        print("Wrote dump.sql")
+        print("dump.sql has been written.")
+
+    if csv_dump:
+        cur.execute('''SELECT * FROM animale.animal;''')
+        original_rows = cur.fetchall()
+
+        with open("dump.csv", 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['gid', 'animal', 'time', 'geom', 'label'])
+            for row in original_rows:
+                tmp = list(row)
+                gid = tmp[0]
+                tmp[-1] = set_of_points[gid].label
+                writer.writerow(tmp)
+        print("dump.csv")
+
 
 
 
@@ -91,7 +107,7 @@ def dbscan(set_of_points, eps, minpts):
                 print("Found cluster = {}".format(cluster_id))
                 cluster_id = next_id()
 
-    update_dbs(set_of_points, sqldump=True)
+    update_dbs(set_of_points, sqldump=True, csv_dump=True)
 
 if __name__ == '__main__':
     conn = psycopg2.connect(database="gis", user="postgres", password="AkrasiaPostgres", host="127.0.0.1", port="5432")
