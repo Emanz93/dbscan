@@ -8,7 +8,14 @@ NOISE = 0
 UNCLASSIFIED = -1
 
 
-def update_dbs(set_of_points, sqldump=False, csv_dump=False):
+def update_dbs(set_of_points, sql_dump=False, csv_dump=False):
+    """Performs the update of the rows in the database. It interact directly with Postgres performing the UPDATE queries.
+    Optional parameters allow to dump the Sql statements and/or to save the list of points in CSV format.
+    Parameters:
+        set_of_points: List of Points.
+        sql_dump: Boolean. Optional parameter. If True enable the dump of the UPDATE queries into dump.sql file.
+        csv_dump: Boolean. Optional parameter. If True enable the dump of the list of points in a CSV file.
+    """
     queries = ""
     for gid, point in set_of_points.items():
         query = "UPDATE animale.animal SET label = " + str(point.label) + " WHERE gid=" + str(gid) + ";\n"
@@ -16,7 +23,7 @@ def update_dbs(set_of_points, sqldump=False, csv_dump=False):
         queries += query
     print("UPDATE on DB")
 
-    if sqldump:
+    if sql_dump:
         with open("dump.sql", 'w') as f:
             f.write(queries)
         print("dump.sql has been written.")
@@ -36,9 +43,13 @@ def update_dbs(set_of_points, sqldump=False, csv_dump=False):
         print("dump.csv")
 
 
-
-
 def region_query(set_of_points, p, eps):
+    """Returns the list of points having distance less then eps from point p.
+    Parameters:
+        set_of_points: List of Points.
+        p: Point. Reference point.
+        eps: Integer. Distance.
+    """
     sql_query = "select a.gid, a.label " \
                 "from animale.animal as a, (select * from animale.animal where gid = " + str(p.gid) + ") as subqry " \
                 "where a.gid != subqry.gid and ST_dwithin(subqry.geom, a.geom, " + str(eps) + ");"
@@ -52,11 +63,25 @@ def region_query(set_of_points, p, eps):
 
 
 def change_cluster_id(set_of_points, seeds, cluster_id):
+    """Change the cluster id of all points belonging to seeds in set_of_points.
+    Parameters:
+        set_of_points: List of Points.
+        seeds: List of Points.
+        cluster_id: Integer. New cluster Id.
+    """
     for seed_key in seeds.keys():
         set_of_points[seed_key].label = cluster_id
 
 
 def expand_cluster(set_of_points, p, cluster_id, eps, minpts):
+    """Recursively classify the points in the neighborhood of p.
+    Parameters:
+        set_of_points: List of Points.
+        p: Point. Reference Point.
+        cluster_id: Integer. Cluster id of point p.
+        eps: Integer. Radius of the neighborhood.
+        minpts: Integer. Minimum number of points for the cluster.
+    """
     seeds = region_query(set_of_points, p, eps)
     if len(seeds) < minpts: # this is not a core point
         set_of_points[p.gid].label = NOISE
@@ -67,7 +92,7 @@ def expand_cluster(set_of_points, p, cluster_id, eps, minpts):
         try:
             del seeds[p.gid]
         except KeyError:
-            pass
+            pass # it will fail because the query doesn't get the point p.
 
         while len(seeds.keys()) != 0:
             current_point = seeds[list(seeds.keys())[0]]
@@ -82,22 +107,22 @@ def expand_cluster(set_of_points, p, cluster_id, eps, minpts):
                         change_cluster_id(set_of_points, {result_point.gid:result_point},cluster_id)
 
             del seeds[current_point.gid]
-
         return True
 
 
 def next_id():
+    """Returns the next cluster id."""
     global CLUSTER_ID
     CLUSTER_ID = CLUSTER_ID + 1
     return CLUSTER_ID
 
 
 def dbscan(set_of_points, eps, minpts):
-    """
-    :param set_of_points: List of Points
-    :param eps:
-    :param minpts:
-    :return:
+    """ Main function of the dbscan algorithm,
+    Parameter:
+        set_of_points: List of Points. List of points to be classified.
+        eps: Integer.
+        minpts: Integer.
     """
     cluster_id = next_id()
     for key in set_of_points.keys():
