@@ -8,20 +8,24 @@ NOISE = 0
 UNCLASSIFIED = -1
 
 
-def update_dbs(set_of_points, sql_dump=False, csv_dump=False):
+def update_dbs(set_of_points, dry_run=False, sql_dump=False, csv_dump=False):
     """Performs the update of the rows in the database. It interact directly with Postgres performing the UPDATE queries.
     Optional parameters allow to dump the Sql statements and/or to save the list of points in CSV format.
     Parameters:
         set_of_points: List of Points.
+        dry_run: Boolean. Optional parameter. If True enable the dry run. The update is not executed.
         sql_dump: Boolean. Optional parameter. If True enable the dump of the UPDATE queries into dump.sql file.
         csv_dump: Boolean. Optional parameter. If True enable the dump of the list of points in a CSV file.
     """
     queries = ""
     for gid, point in set_of_points.items():
         query = "UPDATE animale.animal SET label = " + str(point.label) + " WHERE gid=" + str(gid) + ";\n"
-        cur.execute(query)
         queries += query
-    print("UPDATE on DB")
+
+    if not dry_run:
+        print("UPDATE on DB")
+        cur.execute(queries)
+        conn.commit()
 
     if sql_dump:
         with open("dump.sql", 'w') as f:
@@ -40,7 +44,7 @@ def update_dbs(set_of_points, sql_dump=False, csv_dump=False):
                 gid = tmp[0]
                 tmp[-1] = set_of_points[gid].label
                 writer.writerow(tmp)
-        print("dump.csv")
+        print("dump.csv has been written")
 
 
 def region_query(set_of_points, p, eps):
@@ -132,11 +136,17 @@ def dbscan(set_of_points, eps, minpts):
                 print("Found cluster = {}".format(cluster_id))
                 cluster_id = next_id()
 
-    update_dbs(set_of_points, sqldump=True, csv_dump=True)
+    # dry_run=[True|False], sql_dump=[True|False], csv_dump=[True|False]
+    update_dbs(set_of_points, dry_run=False, sql_dump=True, csv_dump=True)
+
 
 if __name__ == '__main__':
-    conn = psycopg2.connect(database="gis", user="postgres", password="AkrasiaPostgres", host="127.0.0.1", port="5432")
+    conn = psycopg2.connect(database="gis", user="emanuele", password="xxx", host="127.0.0.1", port="5432")
     cur = conn.cursor()
+
+    cur.execute('''UPDATE animale.animal SET label = -1;''')
+    conn.commit()
+
     cur.execute('''SELECT gid, label FROM animale.animal;''')
     rows = cur.fetchall()
     set_of_points = {}
@@ -144,7 +154,7 @@ if __name__ == '__main__':
         p = Point(row)
         set_of_points[p.gid] = p
 
-    eps = 10
+    eps = 300
     minpts = 20
     dbscan(set_of_points, eps, minpts)
 
