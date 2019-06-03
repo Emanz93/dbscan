@@ -144,6 +144,7 @@ if __name__ == '__main__':
     conn = psycopg2.connect(database="gis", user="emanuele", password="xxx", host="127.0.0.1", port="5432")
     cur = conn.cursor()
 
+    # initialization of the label column
     cur.execute('''UPDATE animale.animal SET label = -1;''')
     conn.commit()
 
